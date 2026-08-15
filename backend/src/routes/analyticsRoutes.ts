@@ -172,6 +172,7 @@ router.get("/expense-details/:id", async (req, res) => {
         u.name AS user_name,
         c.name AS category_name,
         c.icon AS category_icon,
+        c.color AS category_color,
         pm.name AS payment_method_name
       FROM expenses e
       JOIN users u ON e.user_id = u.id
