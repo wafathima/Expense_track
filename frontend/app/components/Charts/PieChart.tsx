@@ -22,12 +22,20 @@ type PieChartProps = {
 
 const COLORS = ["#1B4B34", "#2F8F5B", "#6FAE8C", "#B8862B", "#D8B84A", "#7A9E85", "#4E9B6E", "#A79F7E"];
 
-const formatTooltipValue = (value: number | string) => {
-  return [`₹${Number(value).toFixed(2)}`, "Amount"];
+// const formatTooltipValue = (value: number | string) => {
+//   return [`₹${Number(value).toFixed(2)}`, "Amount"];
+// };
+
+const formatTooltipValue = (value: unknown) => {
+  return [`₹${Number(value ?? 0).toFixed(2)}`, "Amount"];
 };
 
-const renderCustomLabel = ({ name, percent }: { name: string; percent: number }) => {
-  return `${name}: ${(percent * 100).toFixed(0)}%`;
+// const renderCustomLabel = ({ name, percent }: { name: string; percent: number }) => {
+//   return `${name}: ${(percent * 100).toFixed(0)}%`;
+// };
+
+const renderCustomLabel = ({ name, percent }: any) => {
+  return `${name ?? ""}: ${((percent ?? 0) * 100).toFixed(0)}%`;
 };
 
 export default function PieChart({ data, title }: PieChartProps) {
