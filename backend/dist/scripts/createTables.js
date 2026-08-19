@@ -3,10 +3,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const db_1 = __importDefault(require("../config/db"));
+const pg_1 = require("pg");
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const pool = new pg_1.Pool({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+});
 async function createTables() {
-    const client = await db_1.default.connect();
+    const client = await pool.connect();
     try {
+        console.log(" Starting migration...");
         await client.query("BEGIN");
         // Create users table
         await client.query(`
@@ -17,7 +27,8 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-        // Create categories table
+        console.log(" Users table created");
+        // Create categories table with proper columns
         await client.query(`
       CREATE TABLE IF NOT EXISTS categories (
         id SERIAL PRIMARY KEY,
@@ -27,6 +38,19 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+        console.log(" Categories table created");
+        // Add missing columns to categories if they don't exist
+        try {
+            await client.query(`
+        ALTER TABLE categories 
+        ADD COLUMN IF NOT EXISTS icon VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS color VARCHAR(20);
+      `);
+            console.log("✅ Added missing columns to categories");
+        }
+        catch (error) {
+            console.log("ℹ️ Columns already exist or couldn't be added");
+        }
         // Create payment_methods table
         await client.query(`
       CREATE TABLE IF NOT EXISTS payment_methods (
@@ -35,6 +59,7 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+        console.log("✅ Payment methods table created");
         // Create expenses table
         await client.query(`
       CREATE TABLE IF NOT EXISTS expenses (
@@ -50,7 +75,8 @@ async function createTables() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-        // Create expense_audit table for transactions demo
+        console.log("✅ Expenses table created");
+        // Create expense_audit table
         await client.query(`
       CREATE TABLE IF NOT EXISTS expense_audit (
         id SERIAL PRIMARY KEY,
@@ -59,9 +85,15 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-        // Create view for expense report
+        console.log("✅ Audit table created");
+        // DROP existing view if it exists
         await client.query(`
-      CREATE OR REPLACE VIEW expense_report AS
+      DROP VIEW IF EXISTS expense_report CASCADE;
+    `);
+        console.log("✅ Dropped existing expense_report view");
+        // Create expense_report view
+        await client.query(`
+      CREATE VIEW expense_report AS
       SELECT 
         e.id,
         e.title,
@@ -77,6 +109,7 @@ async function createTables() {
       LEFT JOIN categories c ON e.category_id = c.id
       LEFT JOIN payment_methods pm ON e.payment_method_id = pm.id;
     `);
+        console.log("✅ Expense report view created");
         // Insert default payment methods
         await client.query(`
       INSERT INTO payment_methods (name) VALUES
@@ -87,42 +120,72 @@ async function createTables() {
         ('Bank Transfer')
       ON CONFLICT (name) DO NOTHING;
     `);
-        // Insert default categories
+        console.log("✅ Default payment methods inserted");
+        // Insert default categories (only if they don't exist)
         await client.query(`
-      INSERT INTO categories (name, icon, color) VALUES
-        ('Food', '🍔', '#FF6B6B'),
-        ('Transport', '🚗', '#4ECDC4'),
-        ('Shopping', '🛍️', '#45B7D1'),
-        ('Entertainment', '🎬', '#96CEB4'),
-        ('Bills', '📄', '#FFEAA7'),
-        ('Healthcare', '🏥', '#DDA0DD'),
-        ('Education', '📚', '#98D8C8'),
-        ('Other', '📌', '#A8A8A8')
+      INSERT INTO categories (name) VALUES
+        ('Food'),
+        ('Transport'),
+        ('Shopping'),
+        ('Entertainment'),
+        ('Bills'),
+        ('Healthcare'),
+        ('Education'),
+        ('Other')
       ON CONFLICT (name) DO NOTHING;
     `);
-        // Insert a default user if none exists
+        console.log("✅ Default categories inserted");
+        // Update categories with icons and colors if columns exist
+        await client.query(`
+      UPDATE categories SET 
+        icon = CASE name
+          WHEN 'Food' THEN '🍔'
+          WHEN 'Transport' THEN '🚗'
+          WHEN 'Shopping' THEN '🛍️'
+          WHEN 'Entertainment' THEN '🎬'
+          WHEN 'Bills' THEN '📄'
+          WHEN 'Healthcare' THEN '🏥'
+          WHEN 'Education' THEN '📚'
+          WHEN 'Other' THEN '📌'
+        END,
+        color = CASE name
+          WHEN 'Food' THEN '#FF6B6B'
+          WHEN 'Transport' THEN '#4ECDC4'
+          WHEN 'Shopping' THEN '#45B7D1'
+          WHEN 'Entertainment' THEN '#96CEB4'
+          WHEN 'Bills' THEN '#FFEAA7'
+          WHEN 'Healthcare' THEN '#DDA0DD'
+          WHEN 'Education' THEN '#98D8C8'
+          WHEN 'Other' THEN '#A8A8A8'
+        END
+      WHERE name IN ('Food', 'Transport', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Education', 'Other')
+      AND icon IS NULL;
+    `);
+        console.log("✅ Updated categories with icons and colors");
+        // Insert default user
         await client.query(`
       INSERT INTO users (name, email) VALUES
         ('John Doe', 'john@example.com')
       ON CONFLICT (email) DO NOTHING;
     `);
+        console.log("✅ Default user inserted");
         await client.query("COMMIT");
-        console.log("✅ Database tables created successfully");
-        console.log("📝 Default data inserted");
+        console.log("🎉 Migration completed successfully!");
     }
     catch (error) {
         await client.query("ROLLBACK");
-        console.error("❌ Error creating tables:", error);
+        console.error("❌ Migration failed:", error);
         throw error;
     }
     finally {
         client.release();
+        await pool.end();
     }
 }
-// Run the migration
+// Run migration
 createTables()
     .then(() => {
-    console.log("✅ Migration completed successfully");
+    console.log("✅ All done!");
     process.exit(0);
 })
     .catch((error) => {
