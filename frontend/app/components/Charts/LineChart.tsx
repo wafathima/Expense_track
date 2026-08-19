@@ -44,7 +44,7 @@ export default function LineChart({ data, title }: LineChartProps) {
             tickLine={{ stroke: "#D9CFA6" }}
           />
           <Tooltip
-            formatter={(value: number) => `₹${value.toFixed(2)}`}
+            formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`}
             contentStyle={{
               backgroundColor: "#FBF9EF",
               border: "1px solid #D9CFA6",

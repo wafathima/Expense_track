@@ -47,7 +47,7 @@ export default function DoughnutChart({ data, title }: DoughnutChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => `₹${value.toFixed(2)}`}
+            formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`}
             contentStyle={{
               backgroundColor: "#FBF9EF",
               border: "1px solid #D9CFA6",
