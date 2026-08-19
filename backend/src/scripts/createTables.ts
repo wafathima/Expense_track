@@ -15,7 +15,7 @@ async function createTables() {
   const client = await pool.connect();
   
   try {
-    console.log("🚀 Starting migration...");
+    console.log(" Starting migration...");
     
     await client.query("BEGIN");
 
@@ -28,7 +28,7 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ Users table created");
+    console.log(" Users table created");
 
     // Create categories table with proper columns
     await client.query(`
@@ -40,7 +40,7 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ Categories table created");
+    console.log(" Categories table created");
 
     // Add missing columns to categories if they don't exist
     try {

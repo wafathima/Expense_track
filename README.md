@@ -1,28 +1,28 @@
-# 💰 Expense Tracker Application
+# Expense Tracker Application
 
 A full-stack expense management application built with Next.js, Express.js, TypeScript, and PostgreSQL.
 
-## 🚀 Features
+##  Features
 
 ### Frontend
-- ✅ Next.js with App Router
-- ✅ TypeScript
-- ✅ Responsive UI with Tailwind CSS
-- ✅ CRUD Operations (Create, Read, Update, Delete)
-- ✅ Search & Filter Expenses
-- ✅ Interactive Charts & Visualizations
-- ✅ Real-time Analytics
+- Next.js with App Router
+- TypeScript
+- Responsive UI with Tailwind CSS
+- CRUD Operations (Create, Read, Update, Delete)
+- Search & Filter Expenses
+- Interactive Charts & Visualizations
+- Real-time Analytics
 
 ### Backend
-- ✅ Express.js REST API
-- ✅ TypeScript
-- ✅ PostgreSQL Database
-- ✅ Validation with Zod
-- ✅ Error Handling
-- ✅ Connection Pooling
-- ✅ Parameterized Queries
+- Express.js REST API
+- TypeScript
+- PostgreSQL Database
+- Validation with Zod
+- Error Handling
+- Connection Pooling
+- Parameterized Queries
 
-## 📊 Database Schema (ER Diagram)
+## Database Schema (ER Diagram)
 
 [ER Diagram](https://dbdiagram.io/d/6a7fecc5c6a866c907715266)
 
