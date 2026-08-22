@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "./components/Navigation";
+import { AuthProvider } from "./context/AuthContext";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -33,8 +34,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} ${fraunces.variable} ${jetbrainsMono.variable}`}>
-        <Navigation />
-        {children}
+        <AuthProvider>
+          <Navigation />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

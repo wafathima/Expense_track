@@ -1,3 +1,4 @@
+//paymentMethodRoutes.ts
 import { Router } from "express";
 import pool from "../config/db";
 
@@ -22,3 +23,4 @@ router.get("/", async (_req, res) => {
 });
 
 export default router;
+

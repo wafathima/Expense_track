@@ -1,8 +1,11 @@
+// frontend/app/dashboard/analytics/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import api from "../../services/api";
-import DashboardCharts from "../components/Charts/DashboardCharts";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../../services/api";
+import DashboardCharts from "../../components/Charts/DashboardCharts";
 
 type ExpenseSummary = {
   total_expenses: string;
@@ -12,17 +15,29 @@ type ExpenseSummary = {
 };
 
 export default function AnalyticsPage() {
+  const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
   const [summary, setSummary] = useState<ExpenseSummary>({
     total_expenses: "0",
     total_amount: "0",
     average_amount: "0",
     highest_amount: "0",
   });
-  const [loading, setLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);
 
+  // Redirect to landing if not authenticated
   useEffect(() => {
-    fetchSummary();
-  }, []);
+    if (!loading && !isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, loading, router]);
+
+  // Fetch data when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchSummary();
+    }
+  }, [isAuthenticated]);
 
   const fetchSummary = async () => {
     try {
@@ -31,9 +46,23 @@ export default function AnalyticsPage() {
     } catch (error) {
       console.error("Failed to fetch summary:", error);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
+
+  // Show loading while checking auth
+  if (loading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{
+        backgroundColor: "rgba(239, 234, 217, 0.85)",
+      }}>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#1B4B34] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-[#8A8264]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main
@@ -85,7 +114,7 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {!loading && (
+        {!loadingData && (
           <div className="rounded-2xl border border-[#D9CFA6] bg-[#FBF9EF] p-6 shadow-sm">
             <DashboardCharts />
           </div>

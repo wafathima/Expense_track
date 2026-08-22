@@ -1,14 +1,29 @@
 import { Request, Response, NextFunction } from "express";
 
 export const errorHandler = (
-  error: unknown,
-  _req: Request,
+  err: any,
+  req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ) => {
-  console.error(error);
+  console.error("Error:", err);
 
-  res.status(500).json({
-    message: "Internal server error",
+  // Handle specific error types
+  if (err.code === "23505") {
+    // PostgreSQL unique violation
+    return res.status(409).json({ message: "Duplicate entry" });
+  }
+
+  if (err.code === "23503") {
+    // PostgreSQL foreign key violation
+    return res.status(400).json({ message: "Invalid reference" });
+  }
+
+  const statusCode = err.status || 500;
+  const message = err.message || "Internal Server Error";
+
+  res.status(statusCode).json({
+    message,
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };

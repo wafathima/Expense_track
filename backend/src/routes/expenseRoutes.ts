@@ -1,5 +1,7 @@
+// backend/src/routes/expenseRoutes.ts
 import { Router } from "express";
 import pool from "../config/db";
+import { authenticate, AuthRequest } from "../middleware/auth.middleware";
 import {
   createExpenseSchema,
   updateExpenseSchema,
@@ -8,23 +10,29 @@ import {
 const router = Router();
 
 // ==========================================
+// 🔒 ALL ROUTES REQUIRE AUTHENTICATION
+// ==========================================
+router.use(authenticate); 
+
+// ==========================================
 // GET ALL EXPENSES + SEARCH + FILTER
 // ==========================================
 
-router.get("/", async (req, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id; // <-- GET USER ID FROM AUTH
+    
     const {
       search,
       category_id,
       payment_method_id,
     } = req.query;
 
-    const values: unknown[] = [];
-    const conditions: string[] = [];
+    const values: unknown[] = [userId]; // <-- FIRST PARAMETER IS USER ID
+    const conditions: string[] = ["expenses.user_id = $1"]; // <-- ALWAYS FILTER BY USER
 
     if (search) {
       values.push(`%${search}%`);
-
       conditions.push(`
         (
           expenses.title ILIKE $${values.length}
@@ -35,7 +43,6 @@ router.get("/", async (req, res) => {
 
     if (category_id) {
       values.push(category_id);
-
       conditions.push(
         `expenses.category_id = $${values.length}`
       );
@@ -43,16 +50,12 @@ router.get("/", async (req, res) => {
 
     if (payment_method_id) {
       values.push(payment_method_id);
-
       conditions.push(
         `expenses.payment_method_id = $${values.length}`
       );
     }
 
-    const whereClause =
-      conditions.length > 0
-        ? `WHERE ${conditions.join(" AND ")}`
-        : "";
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const result = await pool.query(
       `
@@ -69,18 +72,10 @@ router.get("/", async (req, res) => {
         expenses.amount,
         expenses.expense_date
       FROM expenses
-
-      JOIN users
-        ON expenses.user_id = users.id
-
-      JOIN categories
-        ON expenses.category_id = categories.id
-
-      JOIN payment_methods
-        ON expenses.payment_method_id = payment_methods.id
-
+      JOIN users ON expenses.user_id = users.id
+      JOIN categories ON expenses.category_id = categories.id
+      JOIN payment_methods ON expenses.payment_method_id = payment_methods.id
       ${whereClause}
-
       ORDER BY expenses.expense_date DESC;
       `,
       values
@@ -89,17 +84,20 @@ router.get("/", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching expenses:", error);
-
     res.status(500).json({
       message: "Failed to fetch expenses",
     });
   }
 });
 
+// ==========================================
+// GET EXPENSES BY DATE RANGE
+// (ONLY FOR THE AUTHENTICATED USER)
+// ==========================================
 
-// Add this new endpoint for date range filtering
-router.get("/filter-by-date", async (req, res) => {
+router.get("/filter-by-date", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id; // <-- GET USER ID
     const { start_date, end_date } = req.query;
 
     if (!start_date || !end_date) {
@@ -126,10 +124,11 @@ router.get("/filter-by-date", async (req, res) => {
       JOIN users ON expenses.user_id = users.id
       JOIN categories ON expenses.category_id = categories.id
       JOIN payment_methods ON expenses.payment_method_id = payment_methods.id
-      WHERE expenses.expense_date BETWEEN $1 AND $2
+      WHERE expenses.user_id = $1 
+        AND expenses.expense_date BETWEEN $2 AND $3
       ORDER BY expenses.expense_date DESC;
       `,
-      [start_date, end_date]
+      [userId, start_date, end_date] // <-- FILTER BY USER
     );
 
     res.json(result.rows);
@@ -143,9 +142,10 @@ router.get("/filter-by-date", async (req, res) => {
 
 // ==========================================
 // CREATE EXPENSE
+// (AUTOMATICALLY ASSIGNED TO AUTHENTICATED USER)
 // ==========================================
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   // Validate BEFORE connecting to database
   const validatedData = createExpenseSchema.safeParse(req.body);
 
@@ -156,8 +156,9 @@ router.post("/", async (req, res) => {
     });
   }
 
+  // REMOVE user_id from request body - USE AUTHENTICATED USER INSTEAD
+  const userId = req.user?.id; // <-- GET FROM AUTH
   const {
-    user_id,
     category_id,
     payment_method_id,
     title,
@@ -169,13 +170,12 @@ router.post("/", async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // Start transaction
     await client.query("BEGIN");
 
     const result = await client.query(
       `
       INSERT INTO expenses (
-        user_id,
+        user_id,        -- <-- USE AUTHENTICATED USER ID
         category_id,
         payment_method_id,
         title,
@@ -187,7 +187,7 @@ router.post("/", async (req, res) => {
       RETURNING *;
       `,
       [
-        user_id,
+        userId, // <-- USER ID FROM AUTH
         category_id,
         payment_method_id,
         title,
@@ -197,7 +197,6 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    // Save transaction
     await client.query("COMMIT");
 
     res.status(201).json({
@@ -205,26 +204,24 @@ router.post("/", async (req, res) => {
       expense: result.rows[0],
     });
   } catch (error) {
-    // Undo transaction if something fails
     await client.query("ROLLBACK");
-
     console.error("Error creating expense:", error);
-
     res.status(500).json({
       message: "Failed to create expense",
     });
   } finally {
-    // Return client to pool
     client.release();
   }
 });
 
 // ==========================================
 // UPDATE EXPENSE
+// (MUST BELONG TO AUTHENTICATED USER)
 // ==========================================
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id; // <-- GET USER ID
     const { id } = req.params;
 
     // Validate update data
@@ -246,6 +243,19 @@ router.put("/:id", async (req, res) => {
       expense_date,
     } = validatedData.data;
 
+    // FIRST: Check if expense exists AND belongs to user
+    const checkResult = await pool.query(
+      "SELECT id FROM expenses WHERE id = $1 AND user_id = $2",
+      [id, userId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Expense not found or you don't have permission",
+      });
+    }
+
+    // THEN: Update the expense
     const result = await pool.query(
       `
       UPDATE expenses
@@ -255,8 +265,9 @@ router.put("/:id", async (req, res) => {
         title = $3,
         description = $4,
         amount = $5,
-        expense_date = $6
-      WHERE id = $7
+        expense_date = $6,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7 AND user_id = $8
       RETURNING *;
       `,
       [
@@ -267,6 +278,7 @@ router.put("/:id", async (req, res) => {
         amount,
         expense_date,
         id,
+        userId, // <-- ENSURE USER OWNS THE EXPENSE
       ]
     );
 
@@ -282,7 +294,6 @@ router.put("/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating expense:", error);
-
     res.status(500).json({
       message: "Failed to update expense",
     });
@@ -291,24 +302,23 @@ router.put("/:id", async (req, res) => {
 
 // ==========================================
 // DELETE EXPENSE
+// (MUST BELONG TO AUTHENTICATED USER)
 // ==========================================
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user?.id; // <-- GET USER ID
     const { id } = req.params;
 
+    // DELETE only if expense belongs to user
     const result = await pool.query(
-      `
-      DELETE FROM expenses
-      WHERE id = $1
-      RETURNING *;
-      `,
-      [id]
+      "DELETE FROM expenses WHERE id = $1 AND user_id = $2 RETURNING *",
+      [id, userId] // <-- ENSURE USER OWNS THE EXPENSE
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({
-        message: "Expense not found",
+        message: "Expense not found or you don't have permission",
       });
     }
 
@@ -318,7 +328,6 @@ router.delete("/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting expense:", error);
-
     res.status(500).json({
       message: "Failed to delete expense",
     });
@@ -326,12 +335,10 @@ router.delete("/:id", async (req, res) => {
 });
 
 // ==========================================
-// CREATE EXPENSE + AUDIT
-// TRANSACTION DEMONSTRATION
+// CREATE EXPENSE + AUDIT (WITH AUTH)
 // ==========================================
 
-router.post("/with-audit", async (req, res) => {
-  // Validate before getting database connection
+router.post("/with-audit", async (req: AuthRequest, res) => {
   const validatedData = createExpenseSchema.safeParse(req.body);
 
   if (!validatedData.success) {
@@ -341,8 +348,8 @@ router.post("/with-audit", async (req, res) => {
     });
   }
 
+  const userId = req.user?.id; // <-- GET FROM AUTH
   const {
-    user_id,
     category_id,
     payment_method_id,
     title,
@@ -354,14 +361,13 @@ router.post("/with-audit", async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // Start transaction
     await client.query("BEGIN");
 
-    // 1. Create expense
+    // 1. Create expense with authenticated user
     const expenseResult = await client.query(
       `
       INSERT INTO expenses (
-        user_id,
+        user_id,        -- <-- USE AUTHENTICATED USER
         category_id,
         payment_method_id,
         title,
@@ -373,7 +379,7 @@ router.post("/with-audit", async (req, res) => {
       RETURNING *;
       `,
       [
-        user_id,
+        userId, // <-- USER ID FROM AUTH
         category_id,
         payment_method_id,
         title,
@@ -397,7 +403,6 @@ router.post("/with-audit", async (req, res) => {
       [expense.id, "CREATE"]
     );
 
-    // Everything succeeded
     await client.query("COMMIT");
 
     res.status(201).json({
@@ -405,16 +410,12 @@ router.post("/with-audit", async (req, res) => {
       expense,
     });
   } catch (error) {
-    // Something failed → undo everything
     await client.query("ROLLBACK");
-
     console.error("Transaction failed:", error);
-
     res.status(500).json({
       message: "Transaction failed",
     });
   } finally {
-    // Return connection to pool
     client.release();
   }
 });
