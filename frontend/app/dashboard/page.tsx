@@ -242,7 +242,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold text-[#123423]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
             Welcome back, {user?.name}! 👋
           </h1>
-          <p className="text-[#8A8264]">Here's a summary of your expenses</p>
+          <p className="text-[#8A8264]">Here is a summary of your expenses</p>
         </div>
 
         {/* Summary Cards */}

@@ -9,13 +9,14 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/scripts/createTables.ts",
     "migrate:dev": "tsx watch src/scripts/createTables.ts",
-    "reset:db": "tsx src/scripts/resetDatabase.ts"  
+    "reset:db": "tsx src/scripts/resetDatabase.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

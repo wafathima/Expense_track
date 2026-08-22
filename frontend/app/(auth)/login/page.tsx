@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   // If already authenticated, redirect to home
   if (isAuthenticated) {
-    router.push("/");
+    router.push("/dashboard");
     return null;
   }
 
